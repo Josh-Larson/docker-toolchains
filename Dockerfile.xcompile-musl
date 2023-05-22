@@ -1,0 +1,94 @@
+# Prepare build directory
+WORKDIR /gcc_build
+RUN wget https://ftpmirror.gnu.org/binutils/$BINUTILS.tar.bz2
+RUN wget https://ftpmirror.gnu.org/gcc/$GCC/$GCC.tar.gz
+RUN wget https://musl.libc.org/releases/$MUSL.tar.gz
+RUN for t in *.tar.*; do echo $t; tar xf $t; done
+RUN cd $GCC; ./contrib/download_prerequisites; cd ..
+
+# Prepare cross directory
+RUN mkdir $CROSS
+ENV PATH=$CROSS/bin:$PATH
+
+# Build binutils
+RUN mkdir build-binutils; \
+	cd build-binutils && \
+	../$BINUTILS/configure --prefix=$CROSS --target=$TARGET $COMPILE_OPTIONS && \
+	make -j && \
+	make install && \
+	cd ..
+
+# Build partial gcc
+RUN mkdir build-gcc; \
+	cd build-gcc && \
+	../$GCC/configure --prefix=$CROSS --target=$TARGET --enable-languages=c,c++ $COMPILE_OPTIONS \
+		--disable-bootstrap \
+	    --disable-multilib \
+	    --disable-libsanitizer && \
+	make -j all-gcc && \
+	make -j install-gcc && \
+	cd ..
+
+# Install musl headers
+RUN mkdir build-musl; \
+	cd build-musl; \
+	../$MUSL/configure --prefix=$CROSS/$TARGET --target=$TARGET --host=$TARGET --build=$MACHTYPE \
+		LIBCC="$CROSS/lib/gcc/arm-linux-musleabihf/12.2.0/libgcc.a" \
+		$COMPILE_OPTIONS && \
+	make install-headers && \
+	cd ..
+
+# Finish building libgcc
+RUN cd build-gcc; \
+	make enable_shared=no -j all-target-libgcc && \
+	make -j install-target-libgcc && \
+	cd ..
+
+# Build musl
+RUN cd build-musl; \
+	make -j && \
+	make -j install && \
+	cd ..
+
+# Install gcc
+RUN cd build-gcc; \
+	../$GCC/configure --prefix=$CROSS --target=$TARGET --enable-languages=c,c++ $COMPILE_OPTIONS \
+		--disable-bootstrap \
+	    --disable-multilib \
+	    --disable-libsanitizer && \
+	make -j && \
+	make -j install && \
+	cd ..
+
+# Clean up
+WORKDIR /
+RUN rm -rf gcc_build
+
+# Add nice-to-haves
+WORKDIR /extra
+
+RUN apt-get update && apt-get install -y libssl-dev ninja-build
+
+## cmake
+ENV CMAKE_VERSION=3.26.3
+ENV CMAKE=cmake-$CMAKE_VERSION
+
+### Cross Compilation Variables
+RUN echo ""\
+	"set(CMAKE_SYSTEM_NAME Linux)\n"\
+	"set(CMAKE_SYSROOT $SYSROOT)\n"\
+	"set(CMAKE_C_COMPILER $CROSS/bin/$TARGET-gcc)\n"\
+	"set(CMAKE_CXX_COMPILER $CROSS/bin/$TARGET-g++)\n" | sed 's/^ *//' > /toolchain.cmake
+
+### Make and install
+RUN wget "https://github.com/Kitware/CMake/releases/download/v$CMAKE_VERSION/$CMAKE.tar.gz" && \
+	tar xf "$CMAKE.tar.gz" && \
+	cd "$CMAKE" && \
+	CC=`which gcc` CXX=`which g++` ./bootstrap -- -DCMAKE_BUILD_TYPE:STRING=Release && \
+	make -j && \
+	make install
+RUN rm -rf $CMAKE
+ENV CMAKE_TOOLCHAIN_FILE=/toolchain.cmake
+ENV CMAKE_GENERATOR=Ninja
+
+WORKDIR /

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+IMAGE_NAME=xcompile-rpi4
+TAG_PREFIX=gcc-12.2.0
+
+cat Dockerfile.xcompile-glibc ../Dockerfile.xcompile-glibc | docker build -t $IMAGE_NAME:$TAG_PREFIX-glibc --network=host -
+cat Dockerfile.xcompile-musl ../Dockerfile.xcompile-musl | docker build -t $IMAGE_NAME:$TAG_PREFIX-musl --network=host -
