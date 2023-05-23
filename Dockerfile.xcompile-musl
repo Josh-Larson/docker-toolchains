@@ -10,10 +10,20 @@ RUN cd $GCC; ./contrib/download_prerequisites; cd ..
 RUN mkdir $CROSS
 ENV PATH=$CROSS/bin:$PATH
 
+ARG TARGET=$MUSL_TARGET
+ARG BINUTILS_CONFIGURATION="--prefix=$CROSS --target=$TARGET --enable-gold $COMPILE_OPTIONS"
+ARG GCC_CONFIGURATION="--prefix=$CROSS --target=$TARGET \
+	--enable-languages=c,c++ \
+	--disable-bootstrap \
+	--disable-multilib \
+	--disable-libsanitizer \
+	$COMPILE_OPTIONS"
+ARG MUSL_CONFIGURATION="--prefix=$CROSS/$TARGET --target=$TARGET --host=$TARGET --build=$MACHTYPE $COMPILE_OPTIONS"
+
 # Build binutils
 RUN mkdir build-binutils; \
 	cd build-binutils && \
-	../$BINUTILS/configure --prefix=$CROSS --target=$TARGET $COMPILE_OPTIONS && \
+	../$BINUTILS/configure $BINUTILS_CONFIGURATION && \
 	make -j && \
 	make install && \
 	cd ..
@@ -21,43 +31,35 @@ RUN mkdir build-binutils; \
 # Build partial gcc
 RUN mkdir build-gcc; \
 	cd build-gcc && \
-	../$GCC/configure --prefix=$CROSS --target=$TARGET --enable-languages=c,c++ $COMPILE_OPTIONS \
-		--disable-bootstrap \
-	    --disable-multilib \
-	    --disable-libsanitizer && \
+	../$GCC/configure $GCC_CONFIGURATION && \
 	make -j all-gcc && \
-	make -j install-gcc && \
+	make install-gcc && \
 	cd ..
 
 # Install musl headers
 RUN mkdir build-musl; \
 	cd build-musl; \
-	../$MUSL/configure --prefix=$CROSS/$TARGET --target=$TARGET --host=$TARGET --build=$MACHTYPE \
-		LIBCC="$CROSS/lib/gcc/arm-linux-musleabihf/12.2.0/libgcc.a" \
-		$COMPILE_OPTIONS && \
+	../$MUSL/configure LIBCC="$CROSS/lib/gcc/$TARGET/*/libgcc.a" $MUSL_CONFIGURATION && \
 	make install-headers && \
 	cd ..
 
-# Finish building libgcc
+# Build libgcc
 RUN cd build-gcc; \
 	make enable_shared=no -j all-target-libgcc && \
-	make -j install-target-libgcc && \
+	make install-target-libgcc && \
 	cd ..
 
 # Build musl
 RUN cd build-musl; \
 	make -j && \
-	make -j install && \
+	make install && \
 	cd ..
 
-# Install gcc
+# Build gcc
 RUN cd build-gcc; \
-	../$GCC/configure --prefix=$CROSS --target=$TARGET --enable-languages=c,c++ $COMPILE_OPTIONS \
-		--disable-bootstrap \
-	    --disable-multilib \
-	    --disable-libsanitizer && \
+	../$GCC/configure $GCC_CONFIGURATION && \
 	make -j && \
-	make -j install && \
+	make install && \
 	cd ..
 
 # Clean up
@@ -70,8 +72,7 @@ WORKDIR /extra
 RUN apt-get update && apt-get install -y libssl-dev ninja-build
 
 ## cmake
-ENV CMAKE_VERSION=3.26.3
-ENV CMAKE=cmake-$CMAKE_VERSION
+ARG CMAKE=cmake-$CMAKE_VERSION
 
 ### Cross Compilation Variables
 RUN echo ""\

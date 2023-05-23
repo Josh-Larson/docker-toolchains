@@ -10,10 +10,20 @@ RUN cd $GCC; ./contrib/download_prerequisites; cd ..
 RUN mkdir $CROSS
 ENV PATH=$CROSS/bin:$PATH
 
+ARG TARGET=$GLIBC_TARGET
+ARG BINUTILS_CONFIGURATION="--prefix=$CROSS --target=$TARGET --enable-gold $COMPILE_OPTIONS"
+ARG GCC_CONFIGURATION="--prefix=$CROSS --target=$TARGET \
+	--enable-languages=c,c++ \
+	--disable-bootstrap \
+	--disable-multilib \
+	--disable-libsanitizer \
+	$COMPILE_OPTIONS"
+ARG GLIBC_CONFIGURATION="--prefix=$CROSS/$TARGET --target=$TARGET --host=$TARGET --build=$MACHTYPE libc_cv_forced_unwind=yes $COMPILE_OPTIONS"
+
 # Build binutils
 RUN mkdir build-binutils; \
 	cd build-binutils && \
-	../$BINUTILS/configure --prefix=$CROSS --target=$TARGET $COMPILE_OPTIONS && \
+	../$BINUTILS/configure $BINUTILS_CONFIGURATION && \
 	make -j && \
 	make install && \
 	cd ..
@@ -21,7 +31,7 @@ RUN mkdir build-binutils; \
 # Build partial gcc
 RUN mkdir build-gcc; \
 	cd build-gcc && \
-	../$GCC/configure --prefix=$CROSS --target=$TARGET --enable-languages=c,c++ $COMPILE_OPTIONS --disable-libsanitizer --enable-lto && \
+	../$GCC/configure $GCC_CONFIGURATION && \
 	make -j all-gcc && \
 	make install-gcc && \
 	cd ..
@@ -29,7 +39,7 @@ RUN mkdir build-gcc; \
 # Build partial glibc
 RUN mkdir build-glibc; \
 	cd build-glibc && \
-	../$GLIBC/configure --prefix=$CROSS/$TARGET --target=$TARGET --host=$TARGET --build=$MACHTYPE $COMPILE_OPTIONS libc_cv_forced_unwind=yes && \
+	../$GLIBC/configure $GLIBC_CONFIGURATION && \
 	make install-bootstrap-headers=yes install-headers && \
 	make -j csu/subdir_lib && \
 	install csu/crt1.o csu/crti.o csu/crtn.o $CROSS/$TARGET/lib && \
@@ -62,11 +72,10 @@ RUN rm -rf gcc_build
 # Add nice-to-haves
 WORKDIR /extra
 
-RUN apt-get install -y libssl-dev ninja-build
+RUN apt-get update && apt-get install -y libssl-dev ninja-build
 
 ## cmake
-ENV CMAKE_VERSION=3.26.3
-ENV CMAKE=cmake-$CMAKE_VERSION
+ARG CMAKE=cmake-$CMAKE_VERSION
 
 ### Cross Compilation Variables
 RUN echo ""\
