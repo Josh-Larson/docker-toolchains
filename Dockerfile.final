@@ -30,8 +30,9 @@ COPY --from=toolchain-tmp $CROSS $CROSS
 COPY --from=sysroot $SYSROOT $SYSROOT
 
 ### Set cmake cross compilation variables
+ARG OS_TARGET
 RUN echo ""\
-        "set(CMAKE_SYSTEM_NAME Linux)\n"\
+        "set(CMAKE_SYSTEM_NAME $OS_TARGET)\n"\
         "set(CMAKE_SYSROOT $SYSROOT)\n"\
         "set(CMAKE_C_COMPILER $(echo $CROSS/bin/*-gcc))\n"\
         "set(CMAKE_CXX_COMPILER $(echo $CROSS/bin/*-g++))\n" | sed 's/^ *//' > /toolchain.cmake

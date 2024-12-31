@@ -32,7 +32,7 @@ ARG GCC_CONFIGURATION="--prefix=$CROSS --target=$TARGET \
 	--disable-multilib \
 	--disable-libsanitizer \
 	$COMPILE_OPTIONS"
-ARG MUSL_CONFIGURATION="--prefix=$CROSS/$TARGET --target=$TARGET --host=$TARGET --build=$MACHTYPE $COMPILE_OPTIONS"
+ARG MUSL_CONFIGURATION="--prefix=$CROSS/$TARGET --target=$TARGET --host=$TARGET --build=$MACHTYPE --with-sysroot=$SYSROOT"
 
 ARG NPROC
 

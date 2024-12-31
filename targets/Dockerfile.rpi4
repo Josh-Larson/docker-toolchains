@@ -9,8 +9,9 @@ ARG CROSS=/cross
 ARG NPROC=12
 
 ARG MACHTYPE=x86_64-pc-linux-gnu
-ARG COMPILE_OPTIONS="--with-arch=armv8-a --with-tune=cortex-a72 --with-fpu=neon-fp-armv8 --with-float=hard --with-sysroot=$SYSROOT"
+ARG COMPILE_OPTIONS="--with-cpu=cortex-a72 --with-fpu=neon-fp-armv8 --with-float=hard --with-sysroot=$SYSROOT"
 
+ARG OS_TARGET=Linux
 ARG GLIBC_TARGET=arm-linux-gnueabihf
 ARG MUSL_TARGET=arm-linux-musleabihf
 
