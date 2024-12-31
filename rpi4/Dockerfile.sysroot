@@ -1,7 +1,0 @@
-FROM ubuntu:22.04
-
-ENV SYSROOT=/sysroot
-RUN mkdir $SYSROOT
-RUN apt update && apt upgrade -y && apt install -y bison build-essential file gawk git python3 rsync texinfo wget
-RUN git clone --depth=1 --branch rpi-5.15.y https://github.com/raspberrypi/linux
-RUN cd linux; make ARCH=arm INSTALL_HDR_PATH=$SYSROOT/usr headers_install && stat $SYSROOT/usr/include/linux

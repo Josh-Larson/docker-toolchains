@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+TARGET="$1"
+
+if [ -z "$TARGET" ]; then
+	echo "Expected target name as first argument. Example: ./xcompile rpi4"
+	exit 1
+fi
+
+IMAGE_NAME="xcompile-$TARGET"
+DOCKERFILE="targets/Dockerfile.$TARGET"
+TAG_PREFIX=$(grep GCC=gcc- "$DOCKERFILE" | sed 's/.*=//')  # gcc version
+
+cat "$DOCKERFILE" Dockerfile.xcompile-glibc Dockerfile.final | \
+	docker build -t $IMAGE_NAME:$TAG_PREFIX-glibc --network=host -
+
+cat "$DOCKERFILE" Dockerfile.xcompile-musl Dockerfile.final | \
+	docker build -t $IMAGE_NAME:$TAG_PREFIX-musl --network=host -
+

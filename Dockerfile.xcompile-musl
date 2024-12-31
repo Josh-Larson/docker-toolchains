@@ -1,3 +1,20 @@
+FROM ubuntu:22.04 AS toolchain-tmp
+
+ARG BINUTILS
+ARG MUSL
+ARG GCC
+
+ARG SYSROOT
+ARG CROSS
+ARG NPROC
+
+ARG MACHTYPE
+ARG COMPILE_OPTIONS
+
+ARG MUSL_TARGET
+
+RUN apt update && apt upgrade -y && apt install -y bison build-essential gawk python3 texinfo wget
+
 # Prepare build directory
 WORKDIR /gcc_build
 RUN wget https://ftpmirror.gnu.org/binutils/$BINUTILS.tar.bz2
@@ -20,11 +37,14 @@ ARG GCC_CONFIGURATION="--prefix=$CROSS --target=$TARGET \
 	$COMPILE_OPTIONS"
 ARG MUSL_CONFIGURATION="--prefix=$CROSS/$TARGET --target=$TARGET --host=$TARGET --build=$MACHTYPE $COMPILE_OPTIONS"
 
+# Add sysroot
+COPY --from=sysroot $SYSROOT $SYSROOT
+
 # Build binutils
 RUN mkdir build-binutils; \
 	cd build-binutils && \
 	../$BINUTILS/configure $BINUTILS_CONFIGURATION && \
-	make -j && \
+	make -j $NPROC && \
 	make install && \
 	cd ..
 
@@ -32,7 +52,7 @@ RUN mkdir build-binutils; \
 RUN mkdir build-gcc; \
 	cd build-gcc && \
 	../$GCC/configure $GCC_CONFIGURATION && \
-	make -j all-gcc && \
+	make -j $NPROC all-gcc && \
 	make install-gcc && \
 	cd ..
 
@@ -45,51 +65,19 @@ RUN mkdir build-musl; \
 
 # Build libgcc
 RUN cd build-gcc; \
-	make enable_shared=no -j all-target-libgcc && \
+	make enable_shared=no -j $NPROC all-target-libgcc && \
 	make install-target-libgcc && \
 	cd ..
 
 # Build musl
 RUN cd build-musl; \
-	make -j && \
+	make -j $NPROC && \
 	make install && \
 	cd ..
 
 # Build gcc
 RUN cd build-gcc; \
 	../$GCC/configure $GCC_CONFIGURATION && \
-	make -j && \
+	make -j $NPROC && \
 	make install && \
 	cd ..
-
-# Clean up
-WORKDIR /
-RUN rm -rf gcc_build
-
-# Add nice-to-haves
-WORKDIR /extra
-
-RUN apt-get update && apt-get install -y libssl-dev ninja-build
-
-## cmake
-ARG CMAKE=cmake-$CMAKE_VERSION
-
-### Cross Compilation Variables
-RUN echo ""\
-	"set(CMAKE_SYSTEM_NAME Linux)\n"\
-	"set(CMAKE_SYSROOT $SYSROOT)\n"\
-	"set(CMAKE_C_COMPILER $CROSS/bin/$TARGET-gcc)\n"\
-	"set(CMAKE_CXX_COMPILER $CROSS/bin/$TARGET-g++)\n" | sed 's/^ *//' > /toolchain.cmake
-
-### Make and install
-RUN wget "https://github.com/Kitware/CMake/releases/download/v$CMAKE_VERSION/$CMAKE.tar.gz" && \
-	tar xf "$CMAKE.tar.gz" && \
-	cd "$CMAKE" && \
-	CC=`which gcc` CXX=`which g++` ./bootstrap -- -DCMAKE_BUILD_TYPE:STRING=Release && \
-	make -j && \
-	make install
-RUN rm -rf $CMAKE
-ENV CMAKE_TOOLCHAIN_FILE=/toolchain.cmake
-ENV CMAKE_GENERATOR=Ninja
-
-WORKDIR /

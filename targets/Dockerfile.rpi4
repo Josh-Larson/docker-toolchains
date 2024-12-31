@@ -1,0 +1,30 @@
+# Global arguments
+ARG BINUTILS=binutils-2.43
+ARG MUSL=musl-1.2.5
+ARG GLIBC=glibc-2.40
+ARG GCC=gcc-14.2.0
+
+ARG SYSROOT=/sysroot
+ARG CROSS=/cross
+ARG NPROC=12
+
+ARG MACHTYPE=x86_64-pc-linux-gnu
+ARG COMPILE_OPTIONS="--with-arch=armv8-a --with-tune=cortex-a72 --with-fpu=neon-fp-armv8 --with-float=hard --with-sysroot=$SYSROOT"
+
+ARG GLIBC_TARGET=arm-linux-gnueabihf
+ARG MUSL_TARGET=arm-linux-musleabihf
+
+# sysroot
+FROM ubuntu:22.04 AS sysroot
+
+ARG SYSROOT
+ARG KERNEL_VERSION=rpi-6.6.y
+
+RUN mkdir $SYSROOT
+RUN apt update && apt upgrade -y && apt install -y build-essential git rsync
+RUN echo "Cloning raspberry pi kernel. May take up to 10 minutes." && \
+	git clone --depth=1 --branch $KERNEL_VERSION https://github.com/raspberrypi/linux.git
+RUN cd linux && \
+	make ARCH=arm INSTALL_HDR_PATH=$SYSROOT/usr headers_install && \
+	stat $SYSROOT/usr/include/linux
+
