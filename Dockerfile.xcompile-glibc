@@ -1,32 +1,29 @@
 FROM ubuntu:22.04 AS toolchain-tmp
 
-ARG BINUTILS
-ARG GLIBC
-ARG GCC
-
-ARG SYSROOT
-ARG CROSS
-ARG NPROC
-
-ARG MACHTYPE
-ARG COMPILE_OPTIONS
-
-ARG GLIBC_TARGET
-
 RUN apt update && apt upgrade -y && apt install -y bison build-essential gawk python3 texinfo wget
 
 # Prepare build directory
 WORKDIR /gcc_build
-RUN wget https://ftpmirror.gnu.org/binutils/$BINUTILS.tar.bz2
-RUN wget https://ftpmirror.gnu.org/gcc/$GCC/$GCC.tar.gz
-RUN wget https://ftpmirror.gnu.org/glibc/$GLIBC.tar.bz2
-RUN for t in *.tar.*; do echo $t; tar xf $t; done
+ARG BINUTILS
+RUN wget https://ftpmirror.gnu.org/binutils/$BINUTILS.tar.bz2 && tar xf $BINUTILS.tar.bz2 && rm $BINUTILS.tar.bz2
+ARG GCC
+RUN wget https://ftpmirror.gnu.org/gcc/$GCC/$GCC.tar.gz && tar xf $GCC.tar.gz && rm $GCC.tar.gz
 RUN cd $GCC; ./contrib/download_prerequisites; cd ..
+ARG GLIBC
+RUN wget https://ftpmirror.gnu.org/glibc/$GLIBC.tar.bz2 && tar xf $GLIBC.tar.bz2 && rm $GLIBC.tar.bz2
+
+# Add sysroot
+ARG SYSROOT
+COPY --from=sysroot $SYSROOT $SYSROOT
 
 # Prepare cross directory
+ARG CROSS
 RUN mkdir $CROSS
 ENV PATH=$CROSS/bin:$PATH
 
+ARG GLIBC_TARGET
+ARG COMPILE_OPTIONS
+ARG MACHTYPE
 ARG TARGET=$GLIBC_TARGET
 ARG BINUTILS_CONFIGURATION="--prefix=$CROSS --target=$TARGET --enable-gold $COMPILE_OPTIONS"
 ARG GCC_CONFIGURATION="--prefix=$CROSS --target=$TARGET \
@@ -37,8 +34,7 @@ ARG GCC_CONFIGURATION="--prefix=$CROSS --target=$TARGET \
 	$COMPILE_OPTIONS"
 ARG GLIBC_CONFIGURATION="--prefix=$CROSS/$TARGET --target=$TARGET --host=$TARGET --build=$MACHTYPE libc_cv_forced_unwind=yes $COMPILE_OPTIONS"
 
-# Add sysroot
-COPY --from=sysroot $SYSROOT $SYSROOT
+ARG NPROC
 
 # Build binutils
 RUN mkdir build-binutils; \

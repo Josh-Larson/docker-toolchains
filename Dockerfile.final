@@ -2,13 +2,6 @@
 # To build this, run ./xcompile <target>
 FROM ubuntu:22.04
 
-ARG CROSS
-ARG NPROC
-ARG SYSROOT
-
-# Add nice-to-haves
-WORKDIR /extra
-
 RUN apt-get update && apt-get install -y build-essential libssl-dev ninja-build wget python3 python3-pip python3-venv
 
 ## cmake
@@ -16,6 +9,8 @@ ARG CMAKE_VERSION=3.31.3
 ARG CMAKE=cmake-$CMAKE_VERSION
 
 ### Make and install
+ARG NPROC
+WORKDIR /extra
 RUN wget "https://github.com/Kitware/CMake/releases/download/v$CMAKE_VERSION/$CMAKE.tar.gz" && \
         tar xf "$CMAKE.tar.gz" && \
         cd "$CMAKE" && \
@@ -29,6 +24,8 @@ ENV CMAKE_GENERATOR=Ninja
 WORKDIR /
 
 # Add toolchain files
+ARG CROSS
+ARG SYSROOT
 COPY --from=toolchain-tmp $CROSS $CROSS
 COPY --from=sysroot $SYSROOT $SYSROOT
 
